@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💣 扫雷 - Cyberpunk Edition</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --panel: #12121a;
+    --border: #2a2a3a;
+    --text: #e0e0f0;
+    --accent: #00f0ff;
+    --accent2: #ff00aa;
+    --gold: #ffd700;
+    --danger: #ff3344;
+    --revealed: #0d0d1a;
+    --cell-hover: #1e1e38;
+    --neon-glow: 0 0 20px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(0, 240, 255, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 50%, rgba(255, 0, 170, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.04) 0%, transparent 50%);
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  /* 粒子背景 */
+  .particles {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    animation: floatUp linear infinite;
+    opacity: 0;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) scale(0); opacity: 0; }
+    10%  { opacity: 0.8; }
+    90%  { opacity: 0; }
+    100% { transform: translateY(-110vh) scale(1.5); opacity: 0; }
+  }
+
+  .container {
+    position: relative; z-index: 1;
+    background: var(--panel);
+    border: 2px solid var(--border);
+    border-radius: 20px;
+    padding: 30px 35px 35px;
+    box-shadow:
+      0 0 40px rgba(0, 240, 255, 0.1),
+      0 0 80px rgba(255, 0, 170, 0.06),
+      inset 0 1px 0 rgba(255,255,255,0.03);
+    backdrop-filter: blur(20px);
+  }
+
+  /* 标题 */
+  .header {
+    text-align: center; margin-bottom: 20px;
+  }
+  .title {
+    font-size: 42px; font-weight: 900; letter-spacing: 6px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 25px rgba(0,240,255,0.4));
+    margin-bottom: 5px;
+  }
+  .subtitle {
+    font-size: 12px; color: #555; letter-spacing: 4px; text-transform: uppercase;
+  }
+
+  /* 信息栏 */
+  .info-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px; gap: 15px;
+  }
+  .info-item {
+    display: flex; align-items: center; gap: 8px;
+    background: #0c0c18; border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px 16px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .info-icon { font-size: 20px; }
+  .info-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 2px; }
+  .info-value {
+    font-size: 24px; font-weight: 700; letter-spacing: 2px;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+    text-shadow: 0 0 12px rgba(0,240,255,0.5);
+    min-width: 45px; text-align: center;
+  }
+  .info-value.mines { color: var(--accent2); text-shadow: 0 0 12px rgba(255,0,170,0.5); }
+  .info-value.timer  { color: var(--gold);   text-shadow: 0 0 12px rgba(255,215,0,0.5); }
+
+  /* 难度按钮 */
+  .difficulty-bar {
+    display: flex; justify-content: center; gap: 10px; margin-bottom: 18px;
+  }
+  .diff-btn {
+    padding: 6px 18px; border-radius: 20px; border: 1px solid #333;
+    background: transparent; color: #888; cursor: pointer;
+    font-size: 13px; letter-spacing: 1px;
+    transition: all 0.3s ease; font-family: inherit;
+  }
+  .diff-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .diff-btn.active {
+    background: rgba(0,240,255,0.1); border-color: var(--accent);
+    color: var(--accent); box-shadow: 0 0 15px rgba(0,240,255,0.2);
+  }
+
+  /* 游戏板 */
+  .board-wrapper {
+    display: flex; justify-content: center;
+  }
+  .board {
+    display: inline-grid;
+    gap: 2px;
+    background: rgba(0,0,0,0.4);
+    border: 2px solid var(--border);
+    border-radius: 10px; padding: 4px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+  }
+
+  .cell {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px;
+    border-radius: 5px; cursor: pointer;
+    transition: all 0.1s ease;
+    position: relative;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+  }
+  /* 不同尺寸 */
+  .board.expert .cell { width: 28px; height: 28px; font-size: 13px; }
+
+  /* 未揭开 —— 深色凸起 */
+  .cell.hidden {
+    background: linear-gradient(145deg, #2e2e4a, #222238);
+    border: 1px solid #3a3a55;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.1), 0 3px 6px rgba(0,0,0,0.5);
+  }
+  .cell.hidden:hover {
+    background: linear-gradient(145deg, #3a3a5e, #2e2e4e);
+    border-color: var(--accent);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.15), 0 0 12px rgba(0,240,255,0.2);
+    transform: translateY(-1px);
+  }
+  .cell.hidden:active {
+    transform: scale(0.92);
+    transition: transform 0.05s;
+  }
+
+  /* 已揭开 —— 浅色凹陷 */
+  .cell.revealed {
+    background: #0d0d1a;
+    border: 1px solid #111128;
+    cursor: default;
+    animation: revealPop 0.15s ease-out;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+  }
+  @keyframes revealPop {
+    0%   { transform: scale(0.8); }
+    60%  { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  /* 旗子 */
+  .cell.flagged {
+    background: linear-gradient(145deg, #2a1a30, #1e1028);
+    border-color: var(--accent2);
+    animation: flagPlace 0.2s ease-out;
+  }
+  @keyframes flagPlace {
+    0%   { transform: scale(0.7) rotate(-15deg); }
+    60%  { transform: scale(1.15) rotate(3deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  /* 爆炸 */
+  .cell.exploded {
+    background: radial-gradient(circle, #ff3344, #880022) !important;
+    border-color: #ff3344 !important;
+    animation: explode 0.5s ease-out;
+    box-shadow: 0 0 25px rgba(255,51,68,0.8) !important;
+  }
+  @keyframes explode {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
+
+  /* 颜色方案 - 霓虹数字 */
+  .cell.n1  { color: #00bbff; text-shadow: 0 0 8px rgba(0,187,255,0.6); }
+  .cell.n2  { color: #00dd66; text-shadow: 0 0 8px rgba(0,221,102,0.6); }
+  .cell.n3  { color: #ff4444; text-shadow: 0 0 8px rgba(255,68,68,0.6); }
+  .cell.n4  { color: #bb66ff; text-shadow: 0 0 8px rgba(187,102,255,0.6); }
+  .cell.n5  { color: #ff8844; text-shadow: 0 0 8px rgba(255,136,68,0.6); }
+  .cell.n6  { color: #44dddd; text-shadow: 0 0 8px rgba(68,221,221,0.6); }
+  .cell.n7  { color: #ff66aa; text-shadow: 0 0 8px rgba(255,102,170,0.6); }
+  .cell.n8  { color: #aaaaaa; text-shadow: 0 0 8px rgba(170,170,170,0.6); }
+
+  /* 重新开始按钮 */
+  .restart-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, #1a1a30, #0c0c18);
+    border: 2px solid var(--border); cursor: pointer;
+    font-size: 24px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  }
+  .restart-btn:hover {
+    border-color: var(--gold);
+    box-shadow: 0 0 25px rgba(255,215,0,0.3);
+    transform: rotate(180deg);
+  }
+  .restart-btn:active { transform: rotate(180deg) scale(0.9); }
+
+  /* 赢/输提示 */
+  .overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .overlay-card {
+    background: var(--panel); border-radius: 24px; padding: 40px 50px;
+    text-align: center; border: 2px solid var(--border);
+    box-shadow: 0 0 60px rgba(0,240,255,0.15);
+    animation: slideUp 0.4s ease-out;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  .overlay-emoji { font-size: 72px; margin-bottom: 15px; animation: bounce 0.6s ease-out; }
+  @keyframes bounce {
+    0%   { transform: scale(0); }
+    50%  { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+  .overlay-title {
+    font-size: 28px; font-weight: 700; letter-spacing: 3px; margin-bottom: 8px;
+  }
+  .overlay-title.win {
+    background: linear-gradient(135deg, #ffd700, #ffaa00);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .overlay-title.lose {
+    background: linear-gradient(135deg, #ff3344, #ff0066);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .overlay-stats { color: #888; font-size: 14px; margin-bottom: 20px; }
+  .overlay-btn {
+    padding: 12px 35px; border-radius: 25px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; color: #fff; font-size: 16px; font-weight: 600;
+    cursor: pointer; letter-spacing: 2px;
+    transition: all 0.3s ease; font-family: inherit;
+    box-shadow: 0 0 30px rgba(0,240,255,0.3);
+  }
+  .overlay-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 50px rgba(0,240,255,0.5);
+  }
+  .overlay-btn:active { transform: scale(0.95); }
+
+  /* 涟漪效果 */
+  .ripple {
+    position: absolute; border-radius: 50%;
+    pointer-events: none;
+    animation: ripple 0.6s ease-out forwards;
+  }
+  @keyframes ripple {
+    from { width: 0; height: 0; opacity: 0.5; }
+    to   { width: 200px; height: 200px; opacity: 0; margin-left: -100px; margin-top: -100px; }
+  }
+
+  /* 响应式 */
+  @media (max-width: 600px) {
+    .container { padding: 15px; border-radius: 14px; }
+    .title { font-size: 28px; letter-spacing: 3px; }
+    .cell { width: 26px; height: 26px; font-size: 12px; border-radius: 3px; }
+    .board.expert .cell { width: 22px; height: 22px; font-size: 11px; }
+    .info-value { font-size: 18px; }
+    .restart-btn { width: 38px; height: 38px; font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 粒子背景 -->
+<div class="particles" id="particles"></div>
+
+<div class="container">
+  <div class="header">
+    <div class="title">💣 扫 雷 💣</div>
+    <div class="subtitle">Cyberpunk Edition</div>
+  </div>
+
+  <!-- 难度选择 -->
+  <div class="difficulty-bar">
+    <button class="diff-btn active" data-diff="easy">简单 9×9</button>
+    <button class="diff-btn" data-diff="medium">中等 16×16</button>
+    <button class="diff-btn" data-diff="hard">困难 30×16</button>
+  </div>
+
+  <!-- 信息栏 -->
+  <div class="info-bar">
+    <div class="info-item">
+      <span class="info-icon">💣</span>
+      <div>
+        <div class="info-label">Mines</div>
+        <div class="info-value mines" id="mineCount">10</div>
+      </div>
+    </div>
+    <button class="restart-btn" id="restartBtn" title="重新开始">😊</button>
+    <div class="info-item">
+      <span class="info-icon">⏱</span>
+      <div>
+        <div class="info-label">Time</div>
+        <div class="info-value timer" id="timer">000</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 游戏板 -->
+  <div class="board-wrapper">
+    <div class="board" id="board"></div>
+  </div>
+</div>
+
+<!-- 结束弹窗 -->
+<div class="overlay" id="overlay" style="display:none;">
+  <div class="overlay-card">
+    <div class="overlay-emoji" id="overlayEmoji"></div>
+    <div class="overlay-title" id="overlayTitle"></div>
+    <div class="overlay-stats" id="overlayStats"></div>
+    <button class="overlay-btn" id="overlayBtn">再来一局</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ============ 配置 ============
+  const DIFFICULTIES = {
+    easy:   { rows: 9,  cols: 9,  mines: 10 },
+    medium: { rows: 16, cols: 16, mines: 40 },
+    hard:   { rows: 16, cols: 30, mines: 99 },
+  };
+
+  let currentDiff = 'easy';
+  let board = [];           // 2D: { mine, revealed, flagged, adjacentMines }
+  let gameOver = false;
+  let gameWon = false;
+  let timerInterval = null;
+  let elapsedSeconds = 0;
+  let flagCount = 0;
+  let firstClick = true;
+
+  // ============ DOM 引用 ============
+  const boardEl = document.getElementById('board');
+  const mineCountEl = document.getElementById('mineCount');
+  const timerEl = document.getElementById('timer');
+  const restartBtn = document.getElementById('restartBtn');
+  const overlayEl = document.getElementById('overlay');
+  const overlayEmoji = document.getElementById('overlayEmoji');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayStats = document.getElementById('overlayStats');
+  const overlayBtn = document.getElementById('overlayBtn');
+  const diffBtns = document.querySelectorAll('.diff-btn');
+
+  // ============ 粒子背景 ============
+  function createParticles() {
+    const container = document.getElementById('particles');
+    const colors = ['#00f0ff', '#ff00aa', '#ffd700', '#00ff88', '#ff6644', '#bb66ff'];
+    for (let i = 0; i < 40; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random() * 3 + 1.5;
+      p.style.cssText = `
+        left: ${Math.random() * 100}%;
+        bottom: -20px;
+        width: ${size}px; height: ${size}px;
+        background: ${colors[Math.floor(Math.random() * colors.length)]};
+        box-shadow: 0 0 ${size * 3}px ${colors[Math.floor(Math.random() * colors.length)]};
+        animation-duration: ${Math.random() * 10 + 8}s;
+        animation-delay: ${Math.random() * 10}s;
+      `;
+      container.appendChild(p);
+    }
+  }
+
+  // ============ 初始化 / 重置 ============
+  function initBoard() {
+    const cfg = DIFFICULTIES[currentDiff];
+    board = Array.from({ length: cfg.rows }, () =>
+      Array.from({ length: cfg.cols }, () => ({
+        mine: false,
+        revealed: false,
+        flagged: false,
+        adjacentMines: 0,
+      }))
+    );
+    gameOver = false;
+    gameWon = false;
+    firstClick = true;
+    flagCount = 0;
+    elapsedSeconds = 0;
+    clearInterval(timerInterval);
+    timerInterval = null;
+
+    mineCountEl.textContent = String(cfg.mines).padStart(3, '0');
+    timerEl.textContent = '000';
+    restartBtn.textContent = '😊';
+    overlayEl.style.display = 'none';
+
+    renderBoard();
+  }
+
+  function renderBoard() {
+    const cfg = DIFFICULTIES[currentDiff];
+    boardEl.className = 'board';
+    if (currentDiff === 'hard') boardEl.classList.add('expert');
+    boardEl.style.gridTemplateColumns = `repeat(${cfg.cols}, 1fr)`;
+    boardEl.innerHTML = '';
+
+    for (let r = 0; r < cfg.rows; r++) {
+      for (let c = 0; c < cfg.cols; c++) {
+        const cell = board[r][c];
+        const el = document.createElement('div');
+        el.className = 'cell';
+        el.dataset.row = r;
+        el.dataset.col = c;
+
+        if (cell.revealed) {
+          el.classList.add('revealed');
+          if (cell.mine) {
+            el.classList.add('exploded');
+            el.textContent = '💣';
+          } else if (cell.adjacentMines > 0) {
+            el.classList.add('n' + cell.adjacentMines);
+            el.textContent = cell.adjacentMines;
+          }
+        } else {
+          el.classList.add('hidden');
+          if (cell.flagged) {
+            el.classList.add('flagged');
+            el.textContent = '🚩';
+          }
+        }
+
+        el.addEventListener('click', () => onCellClick(r, c));
+        el.addEventListener('contextmenu', (e) => { e.preventDefault(); onCellRightClick(r, c); });
+
+        boardEl.appendChild(el);
+      }
+    }
+  }
+
+  function updateCellElement(r, c) {
+    const el = boardEl.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+    if (!el) return;
+    const cell = board[r][c];
+
+    el.className = 'cell';
+    el.textContent = '';
+
+    if (cell.revealed) {
+      el.classList.add('revealed');
+      if (cell.mine) {
+        el.classList.add('exploded');
+        el.textContent = '💣';
+      } else if (cell.adjacentMines > 0) {
+        el.classList.add('n' + cell.adjacentMines);
+        el.textContent = cell.adjacentMines;
+      }
+    } else {
+      el.classList.add('hidden');
+      if (cell.flagged) {
+        el.classList.add('flagged');
+        el.textContent = '🚩';
+      }
+    }
+  }
+
+  // ============ 放置地雷 ============
+  function placeMines(safeR, safeC) {
+    const cfg = DIFFICULTIES[currentDiff];
+    const safeZone = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const nr = safeR + dr, nc = safeC + dc;
+        if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols) {
+          safeZone.push({ r: nr, c: nc });
+        }
+      }
+    }
+
+    let placed = 0;
+    while (placed < cfg.mines) {
+      const r = Math.floor(Math.random() * cfg.rows);
+      const c = Math.floor(Math.random() * cfg.cols);
+      if (board[r][c].mine) continue;
+      if (safeZone.some(p => p.r === r && p.c === c)) continue;
+      board[r][c].mine = true;
+      placed++;
+    }
+
+    // 计算相邻地雷数
+    for (let r = 0; r < cfg.rows; r++) {
+      for (let c = 0; c < cfg.cols; c++) {
+        if (board[r][c].mine) continue;
+        board[r][c].adjacentMines = countAdjacentMines(r, c);
+      }
+    }
+  }
+
+  function countAdjacentMines(r, c) {
+    const cfg = DIFFICULTIES[currentDiff];
+    let count = 0;
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols && board[nr][nc].mine) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  // ============ 交互 ============
+  function onCellClick(r, c) {
+    if (gameOver || gameWon) return;
+    const cell = board[r][c];
+    if (cell.revealed || cell.flagged) return;
+
+    if (firstClick) {
+      placeMines(r, c);
+      firstClick = false;
+      startTimer();
+    }
+
+    revealCell(r, c);
+    checkWin();
+    renderBoard();
+  }
+
+  function onCellRightClick(r, c) {
+    if (gameOver || gameWon) return;
+    const cell = board[r][c];
+    if (cell.revealed) return;
+    if (firstClick) return; // 不允许在首次点击前插旗
+
+    cell.flagged = !cell.flagged;
+    flagCount += cell.flagged ? 1 : -1;
+    const cfg = DIFFICULTIES[currentDiff];
+    mineCountEl.textContent = String(cfg.mines - flagCount).padStart(3, '0');
+
+    updateCellElement(r, c);
+  }
+
+  function revealCell(r, c) {
+    const cfg = DIFFICULTIES[currentDiff];
+    const cell = board[r][c];
+    if (cell.revealed || cell.flagged) return;
+
+    cell.revealed = true;
+
+    if (cell.mine) {
+      // 游戏结束
+      gameOver = true;
+      stopTimer();
+      restartBtn.textContent = '😵';
+      revealAllMines();
+      renderBoard();
+      showGameOver(false);
+      return;
+    }
+
+    // 如果是空格，展开
+    if (cell.adjacentMines === 0) {
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols) {
+            revealCell(nr, nc);
+          }
+        }
+      }
+    }
+  }
+
+  function revealAllMines() {
+    const cfg = DIFFICULTIES[currentDiff];
+    for (let r = 0; r < cfg.rows; r++) {
+      for (let c = 0; c < cfg.cols; c++) {
+        if (board[r][c].mine && !board[r][c].flagged) {
+          board[r][c].revealed = true;
+        }
+        // 标错的旗子
+        if (board[r][c].flagged && !board[r][c].mine) {
+          board[r][c].revealed = true;
+          board[r][c].flagged = false;
+        }
+      }
+    }
+  }
+
+  function checkWin() {
+    const cfg = DIFFICULTIES[currentDiff];
+    let unrevealedSafe = 0;
+    for (let r = 0; r < cfg.rows; r++) {
+      for (let c = 0; c < cfg.cols; c++) {
+        if (!board[r][c].mine && !board[r][c].revealed) unrevealedSafe++;
+      }
+    }
+    if (unrevealedSafe === 0) {
+      gameWon = true;
+      stopTimer();
+      restartBtn.textContent = '😎';
+      // 自动标记所有地雷
+      for (let r = 0; r < cfg.rows; r++) {
+        for (let c = 0; c < cfg.cols; c++) {
+          if (board[r][c].mine && !board[r][c].flagged) {
+            board[r][c].flagged = true;
+          }
+        }
+      }
+      flagCount = cfg.mines;
+      mineCountEl.textContent = '000';
+      renderBoard();
+      showGameOver(true);
+    }
+  }
+
+  // ============ 计时器 ============
+  function startTimer() {
+    timerInterval = setInterval(() => {
+      elapsedSeconds++;
+      timerEl.textContent = String(Math.min(elapsedSeconds, 999)).padStart(3, '0');
+    }, 1000);
+  }
+
+  function stopTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  // ============ 游戏结束弹窗 ============
+  function showGameOver(won) {
+    setTimeout(() => {
+      overlayEl.style.display = 'flex';
+      if (won) {
+        overlayEmoji.textContent = '🎉';
+        overlayTitle.textContent = '恭喜通关！';
+        overlayTitle.className = 'overlay-title win';
+        overlayStats.textContent = `用时 ${elapsedSeconds} 秒`;
+      } else {
+        overlayEmoji.textContent = '💥';
+        overlayTitle.textContent = '踩到地雷了！';
+        overlayTitle.className = 'overlay-title lose';
+        overlayStats.textContent = '';
+      }
+    }, won ? 300 : 500);
+  }
+
+  // ============ 事件监听 ============
+  restartBtn.addEventListener('click', initBoard);
+  overlayBtn.addEventListener('click', initBoard);
+  overlayEl.addEventListener('click', (e) => {
+    if (e.target === overlayEl) initBoard();
+  });
+
+  diffBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      diffBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentDiff = btn.dataset.diff;
+      initBoard();
+    });
+  });
+
+  // 键盘 R 键重新开始
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'r' || e.key === 'R') initBoard();
+  });
+
+  // ============ 启动 ============
+  createParticles();
+  initBoard();
+})();
+</script>
+</body>
+</html>
